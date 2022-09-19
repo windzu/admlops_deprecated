@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "${workspace}/tools/train.py",
+            "type": "python",
+            "request": "launch",
+            "python": "/home/wind/miniconda3/envs/mmdet3d/bin/python",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "./configs/pointpillars/hv_pointpillars_secfpn_6x8_160e_lidar-3d-car.py",
+            ]
+        }
+    ]
+}
