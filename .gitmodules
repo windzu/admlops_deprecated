@@ -1,16 +1,16 @@
-[submodule "mmdeploy"]
-	path = mmdeploy
-	url = https://github.com/open-mmlab/mmdeploy.git
-	ignore = dirty
 [submodule "mmdetection"]
 	path = mmdetection
-	url = https://github.com/open-mmlab/mmdetection.git
-	ignore = dirty
+	url = https://github.com/open-mmlab/mmdetection
+    ignore = dirty
 [submodule "mmdetection3d"]
 	path = mmdetection3d
-	url = https://github.com/open-mmlab/mmdetection3d.git
-	ignore = dirty
+	url = https://github.com/open-mmlab/mmdetection3d
+    ignore = dirty
+[submodule "mmdeploy"]
+	path = mmdeploy
+	url = https://github.com/open-mmlab/mmdeploy
+    ignore = dirty
 [submodule "mmcv"]
 	path = mmcv
-	url = https://github.com/open-mmlab/mmcv.git
-	ignore = dirty
+	url = https://github.com/open-mmlab/mmcv
+    ignore = dirty
