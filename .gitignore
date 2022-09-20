@@ -1,3 +1,8 @@
+# checkpoints
+/checkpoints
+# data
+/data
+
 # docs ignore
 **/_build
 

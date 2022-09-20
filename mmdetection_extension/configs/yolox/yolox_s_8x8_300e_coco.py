@@ -1,12 +1,12 @@
 import os
 
-mmlab_extension_path = os.environ["MMLAB_EXTENSION_PATH"]
+ADMLOPS_PATH = os.environ["ADMLOPS_PATH"]
 
 ###########################################
 ########### datasets settings #############
 ###########################################
 # NOTE ： 这里使用多个coco数据集
-data_root = mmlab_extension_path + "/mmdetection/data/COCO_TLD/"
+data_root = ADMLOPS_PATH + "/data/mmdet/COCO_TLD/"
 tld_dataset_list = ["bstld", "huawei", "shanjiaoke", "weitang"]
 # 遍历指定的数据集，将数据集组合成一个数据集列表
 train_ann_file_list = [
@@ -210,6 +210,4 @@ mp_start_method = "fork"
 # base_batch_size = (x GPUs) x (y samples per GPU)
 auto_scale_lr = dict(base_batch_size=64)
 
-load_from = (
-    mmlab_extension_path + "/mmdetection/checkpoints/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
-)
+load_from = ADMLOPS_PATH + "/checkpoints/mmdet3d/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
