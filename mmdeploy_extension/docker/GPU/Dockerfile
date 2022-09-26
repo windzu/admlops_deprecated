@@ -122,7 +122,9 @@ RUN apt update && apt install -y ros-noetic-autoware-msgs ros-noetic-foxglove-ms
 # - pip install pycuda 
 RUN /opt/conda/bin/pip install -U openmim && \
     /opt/conda/bin/mim install mmdet && \
-    /opt/conda/bin/mim install mmsegmentation
+    /opt/conda/bin/mim install mmsegmentation && \
+    cd /root/workspace && git clone https://github.com/open-mmlab/mmdetection3d.git && \
+    cd mmdetection3d && /opt/conda/bin/pip install -e . 
 
 
 
