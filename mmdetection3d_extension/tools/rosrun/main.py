@@ -9,7 +9,7 @@ import time
 
 # add path
 # get mmdetection3d path from env variable
-mmlab_extension_path = os.environ["MMLAB_EXTENSION_PATH"]
+admlops_path = os.environ["ADMLOPS_PATH"]
 
 # mmlab
 import mmcv
@@ -146,7 +146,7 @@ def quick_combine_config(test_mode, model_name, config_file_name):
             checkpoint_path (str): 模型的checkpoint路径
     """
     config_path = os.path.join(
-        mmlab_extension_path,
+        admlops_path,
         "mmdetection3d_extension",
         "configs",
         model_name,
@@ -154,7 +154,7 @@ def quick_combine_config(test_mode, model_name, config_file_name):
     )
     if test_mode:
         checkpoint_path = os.path.join(
-            mmlab_extension_path,
+            admlops_path,
             "mmdetection3d_extension",
             "work_dirs",
             config_file_name.split(".")[0],
@@ -162,7 +162,7 @@ def quick_combine_config(test_mode, model_name, config_file_name):
         )
     else:
         current_checkpoints_dir = os.path.join(
-            mmlab_extension_path,
+            admlops_path,
             "mmdetection3d",
             "checkpoints",
             model_name,

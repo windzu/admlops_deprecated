@@ -7,7 +7,7 @@ from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.pipelines import LoadAnnotations, LoadImageFromFile
 from mmdet3d.datasets.builder import PIPELINES
 
-from pypcd import pypcd
+from wadda.pypcd import pypcd
 
 
 @PIPELINES.register_module()

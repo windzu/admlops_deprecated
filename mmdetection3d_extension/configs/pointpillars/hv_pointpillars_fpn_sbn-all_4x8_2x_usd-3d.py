@@ -1,6 +1,6 @@
 import os
 
-mmlab_extension_path = os.environ["MMLAB_EXTENSION_PATH"]
+admlops_path = os.environ["ADMLOPS_PATH"]
 
 ###########################################
 ########### datasets settings #############
@@ -24,8 +24,8 @@ dataset_type = "USDDataset"
 infos_prefix = "usd"
 
 # choose different data for training and testing
-# data_root = mmlab_extension_path + "/mmdetection3d/data/apollo_lidar/"
-data_root = mmlab_extension_path + "/mmdetection3d/data/USD/"
+data_root = admlops_path + "/data/mmdet3d/USD_Apollo/"
+data_root = admlops_path + "/data/mmdet3d/USD_Apollo_SUB/"
 
 input_modality = dict(
     use_lidar=True,
@@ -134,7 +134,9 @@ data = dict(
 evaluation = dict(interval=1, pipeline=eval_pipeline)  # interval=24 or 1
 
 
-# model settings
+###########################################
+############ models settings ##############
+###########################################
 # Voxel size for voxel encoder
 # Usually voxel size is changed consistently with the point cloud range
 # If point cloud range is modified, do remember to change all related
@@ -240,7 +242,9 @@ model = dict(
     ),
 )
 
-
+###########################################
+########### schedules settings ############
+###########################################
 # optimizer
 # This schedule is mainly used by models on nuScenes dataset
 optimizer = dict(type="AdamW", lr=0.001, weight_decay=0.01)
@@ -248,9 +252,12 @@ optimizer = dict(type="AdamW", lr=0.001, weight_decay=0.01)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 lr_config = dict(policy="step", warmup="linear", warmup_iters=1000, warmup_ratio=1.0 / 1000, step=[20, 23])
 momentum_config = None
+
+###########################################
+############ runtime settings #############
+###########################################
 # runtime settings
 runner = dict(type="EpochBasedRunner", max_epochs=30)  # max_epochs = 24
-
 
 checkpoint_config = dict(interval=1)
 # yapf:disable push
