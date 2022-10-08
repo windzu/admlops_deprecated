@@ -1,10 +1,8 @@
-# admlops
-
-> MLOps for autonomous driving perception tasks
-
-## Introduction
+# Introduction
 
 > Introduction about Autonomous Driving Perception Tasks
+
+admlops means MLOps for autonomous driving perception tasks
 
 The autonomous driving perception task should be a closed-loop task, and its life cycle should include at least three stages, such as data, model, and deployment. Therefore, in the design process of MLOps, at least these three directions need to be covered. More features will be added in the future
 
