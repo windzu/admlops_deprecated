@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "mmlab_extension"
+project = "admlops"
 copyright = "2022, windzu"
 author = "windzu"
 release = "latest"
