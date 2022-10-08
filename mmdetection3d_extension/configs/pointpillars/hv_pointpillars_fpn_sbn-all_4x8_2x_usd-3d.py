@@ -1,6 +1,6 @@
 import os
 
-mmlab_extension_path = os.environ["MMLAB_EXTENSION_PATH"]
+admlops_path = os.environ["ADMLOPS_PATH"]
 
 ###########################################
 ########### datasets settings #############
@@ -24,8 +24,8 @@ dataset_type = "USDDataset"
 infos_prefix = "usd"
 
 # choose different data for training and testing
-# data_root = mmlab_extension_path + "/mmdetection3d/data/apollo_lidar/"
-data_root = mmlab_extension_path + "/mmdetection3d/data/USD/"
+data_root = admlops_path + "/data/mmdet3d/USD_Apollo/"
+data_root = admlops_path + "/data/mmdet3d/USD_Apollo_SUB/"
 
 input_modality = dict(
     use_lidar=True,
