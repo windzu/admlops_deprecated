@@ -1,5 +1,9 @@
-.. toctree::
-   :maxdepth: 2
+Tutorials
+===========================================
 
-   demo.md
+.. toctree::
+   :maxdepth: 1
+
+   pointpillars.md
+   centerpoint.md
 

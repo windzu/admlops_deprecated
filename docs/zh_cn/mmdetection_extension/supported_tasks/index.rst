@@ -1,5 +1,8 @@
+Supported Tasks
+===========================================
+
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    mono_detection.md
    mono_segmentation.md

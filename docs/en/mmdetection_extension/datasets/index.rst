@@ -1,5 +1,10 @@
-.. toctree::
-   :maxdepth: 2
+Datasets
+===========================================
 
-   demo.md
+.. toctree::
+   :maxdepth: 1
+
+   coco.md
+   voc.md
+   bdd100k.md
 

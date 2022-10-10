@@ -208,7 +208,7 @@ docker-compose up -d
 - The container needs to configure the master-slave machine with the host: this requires the host to create a bridge network and specify a network segment, and the container needs to specify the network and its own ip when creating
 - Add the master-slave configuration of ros in container and host
 
-## create docker bridge network
+## Create docker bridge network
 
 - network type: bridge
 - subnet: 172.28.0.0
@@ -220,7 +220,7 @@ docker network create \
   admlops
 ```
 
-## specify network and set ip in docker-compose
+## Specify network and set ip in docker-compose
 
 ```bash
 services:
@@ -234,7 +234,7 @@ networks:
     external: true
 ```
 
-## container中设置主从机
+## Set ROS master and slave in container
 
 > Because the container has only one ip, it directly obtains its address and fills in it, instead of manually assigning a fixed address
 

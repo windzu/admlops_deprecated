@@ -1,6 +1,6 @@
-# Tutorial 1: Traffic Light Detection
+# YOLOX
 
-This tutorial will demonstrate how to use this framework to complete the model training of common signal light detection tasks in autonomous driving
+This tutorial will demonstrate how to use this framework to use the yolox model to complete the model training for the common signal light detection task in autonomous driving
 
 ## Data Preparation
 

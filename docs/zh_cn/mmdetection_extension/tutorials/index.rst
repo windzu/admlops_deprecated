@@ -1,5 +1,8 @@
-.. toctree::
-   :maxdepth: 2
+Tutorials
+===========================================
 
-   traffic_light_detection.md
-   lane_line_detection.md
+.. toctree::
+   :maxdepth: 1
+
+   yolox.md
+   yolopv2.md

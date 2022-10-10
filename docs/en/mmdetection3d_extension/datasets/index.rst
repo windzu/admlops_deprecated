@@ -1,5 +1,9 @@
-.. toctree::
-   :maxdepth: 2
+Datasets
+===========================================
 
-   demo.md
+.. toctree::
+   :maxdepth: 1
+
+   kitti.md
+   usd.md
 

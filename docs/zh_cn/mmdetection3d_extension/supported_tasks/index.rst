@@ -1,5 +1,9 @@
-.. toctree::
-   :maxdepth: 2
+Supported Tasks
+===========================================
 
-   demo.md
+.. toctree::
+   :maxdepth: 1
+
+   mono_3d_detection.md
+   lidar_3d_detection.md
 

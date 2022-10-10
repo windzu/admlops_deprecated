@@ -1,6 +1,6 @@
-# Tutorial 1: Traffic Light Detection
+# YOLOX
 
-本教程将演示如何通过本框架完成自动驾驶中常见的信号灯检测任务的模型训练
+本教程将演示如何通过本框架使用yolox模型完成自动驾驶中常见的信号灯检测任务的模型训练
 
 ## Data Preparation
 
