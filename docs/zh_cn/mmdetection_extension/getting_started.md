@@ -1,32 +1,44 @@
-# Installation
+# Introduction
 
-> 目前仅提提供conda的安装方式
+目前自动驾驶领域，基于Camera或Lidar的3D检测方法层出不穷，对于Camera而言，为了达到3D检测目的必须解决IPM(Inverse Perspective Mapping)问题，从数学层面比较可靠的方式必需要通过多帧或多视角的方式在时域或空域完成对场景的“隐性重建”
+
+2D图像具有非常高的信息密度，但目前的所有方法中，均无法解决在IPM过程中的信息丢失问题，例如目前最有前景的BEV方法，存在BEV特征不够丰富、过远距离准确度急剧下降等问题，该问题的本质原因其实就是IPM过程中的信息丢失问题。而该问题会直接导致在小目标和远距离检测任务中Recall和Confidence的下降，而这两个任务对于解决自动驾驶的Corner Case至关重要
+
+此外基于Camera的2D检测可以通过较低的成本完成相对较为简单的自动驾驶任务，这对于某些限定场景依然十分适用所以基于Camera的2D检测任务目前依然是自动驾驶任务绕不开的方向
+
+本工程是一个2D检测任务框架，可以帮助使用者快速的完成数据准备、模型搭建、模型训练等任务，从而提高使用者的工作效率
+
+## Supported Tasks
+
+本工程支持的任务如下
+- 单相机检测 (已完成)
+- 单相机分割 (已完成)
+- 单相机多任务 (开发中)
+- 多相机检测 (开发中)
+- 多相机分割 (开发中)
+- 多相机多任务 (开发中)
+
+上述任务中，同一个任务对应多个多个网络模型，使用者可以根据自己的需求而择优选择
+
+## Datasets
+
+本工程支持的数据集如下
+- BDD100K
+- COCO
+- VOC
+- USD (自定义数据集)
+
+针对上述数据集，还提供了互相转换的脚本，详情请参考对应的具体文档
+
+## Tutorials
+
+为了方便大家快速上手使用以及提高对本工程的理解，本工程还提供了一系列保姆级教程，这些教程一般是结合自动驾驶中常见的任务而展开的，希望能给大家提供一些思路
+
+本工程提供的教程如下
+- yolox : 通过yolox完成信号灯检测
+- yolopv2 : 通过yolopv2完成目标检测、可通行区域分割、车道线分割
 
 
-> 其中mmcv中的cuda算子编译依赖宿主机安装的cuda,所以在不同cuda版本下安装略有区别,下面分别提供ubuntu18.04+cuda10.2和ubuntu20.04+cuda11.3的示例
+如果在使用过程中发现bug或者文档错误，非常欢迎您能提issus或pr，我将在收到通知后的第一时间尽快修复
 
-## ubuntu18.04 cuda10.2
-
-```bash
-# 待补充
-```
-
-## ubuntu20.04 cuda11.3
-
-```bash
-export CONDA_ENV_NAME=mmdet && \
-export PYTHON_VERSION=3.8 && \
-export CUDA_VERSION=11.3 && \
-export MMCV_VERSION=1.6.0 && \
-export MMCV_CUDA_VERSION=113 && \
-export TORCH_VERSION=1.12.0 && \
-conda create -n $CONDA_ENV_NAME python=$PYTHON_VERSION -y && \
-conda activate $CONDA_ENV_NAME && \
-conda install pytorch=$TORCH_VERSION torchvision torchaudio cudatoolkit=$CUDA_VERSION -c pytorch -y && \
-pip3 install openmim && \
-mim install mmcv-full==$MMCV_VERSION && \
-cd $MMLAB_EXTENSION_PATH/mmdetection && \
-pip3 install -e . && \
-cd $MMLAB_EXTENSION_PATH/mmdetection_extension && \
-pip3 install -e . 
-```
+最后，如果觉得本工程对您有帮助，希望能给一个star，我将会非常开心，感谢！
