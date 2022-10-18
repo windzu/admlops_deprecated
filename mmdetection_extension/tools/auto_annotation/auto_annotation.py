@@ -36,29 +36,36 @@ class AutoAnnotation:
         self.model = init_detector(self.config, self.checkpoint, device=self.device)
         self.class_names = self.model.CLASSES
 
-        # get all file list
-        self.file_list = self._parse_file_list()
-
     def run(self):
 
-        result_list = []
-        if self.file_list:
-            for file in track(self.file_list):
+        if str(self.type) == "scalabel":
+            frames = self.parse_scalabel(self.input)
+            for frame in track(frames):
                 # test a single image
                 # judge if the file is a path or url
-                if file.startswith("http://") or file.startswith("https://"):
-                    resp = urlopen(file)
-                    img = np.asarray(bytearray(resp.read()), dtype="uint8")
-                    img = cv2.imdecode(img, -1)
-                else:
-                    img = cv2.imread(file)
+                img_path = frame["url"]
+
+                resp = urlopen(img_path)
+                img = np.asarray(bytearray(resp.read()), dtype="uint8")
+                img = cv2.imdecode(img, -1)
 
                 result = inference_detector(self.model, img)
-                result = self._filter_result(file, result)
-                if result:
-                    result_list.append(result)
+                (bboxes, labels, label_names) = self.format_result_to_standard_format(
+                    result, self.class_names, self.score_thr
+                )
 
-        self._save_result(result_list)
+                labels = self.format_result_to_scalabel_format(bboxes, labels, label_names)
+
+                frame["labels"] = labels
+
+            save_path = self.input.split(".json")[0] + "_auto_annotation.json"
+            with open(save_path, "w") as f:
+                json.dump(frames, f, indent=4)
+
+            print("Save result to {}".format(save_path))
+
+        elif str(self.type) == "voc":
+            pass
 
         print("Done")
 
@@ -84,14 +91,6 @@ class AutoAnnotation:
             print("Invalid type")
             return None
 
-    def _save_result(self, result_list):
-        if str(self.type) == "scalabel":
-            save_path = self.input.split(".json")[0] + "_auto_annotation.json"
-            print("Save result to {}".format(save_path))
-            self.save_scalabel(result_list, save_path)
-        else:
-            print("Invalid type")
-
     def _parse_file_list(self):
         """根据输入的文件路径或者文件夹路径以及其对应的数据类型，解析出图片列表
 
@@ -109,23 +108,38 @@ class AutoAnnotation:
         """解析scalabel格式的图像列表文件
 
         scalabel格式的图像列表文件是一个json文件,其内容如下：
-        {
+        [
             {
-                "url": "http://localhost:8686/items/weitang_image/zhixian1.jpg"
+                "name": "http://localhost:8686/items/imgs_00/0000.jpg",
+                "url": "http://localhost:8686/items/imgs_00/0000.jpg",
+                "videoName": "",
+                "timestamp": 0,
+                "intrinsics":{
+                    focal: [0, 0],
+                    center: [0, 0],
+                },
+                "extrinsics":{
+                    location: [0, 0, 0],
+                    rotation: [0, 0, 0],
+                },
+                "attributes":{},
+                "size":{
+                    "width": 1920,
+                    "height": 1080
+                }
+                "labels":[] # 等待自动标注进行填充
+                "sensor": -1,
             },
-            {
-                "url": "http://localhost:8686/items/weitang_image/zhixian2.jpg"
-            },
-        ...
-        }
+            ...
+        ]
 
         Args:
             input (str): scalabel格式的图像列表文件
         """
         # load json and get all url to list and return
         with open(path, "r") as f:
-            data = json.load(f)
-            return [item["url"] for item in data]
+            frames = json.load(f)
+            return frames
 
     @staticmethod
     def format_result_to_standard_format(result, class_names, score_thr=0.3):
@@ -181,19 +195,12 @@ class AutoAnnotation:
 
     @staticmethod
     def format_result_to_scalabel_format(bboxes, labels, label_names):
-        result = {
-            "name": "",
-            "url": "",
-            "videoName": "",
-            "timestamp": 0,
-            "attributes": {},
-            "labels": [],
-            "sensor": -1,
-        }
+
+        scalabel_labels = []
         # filter out the results which are not in the required format
         for i, (bbox, label, label_name) in enumerate(zip(bboxes, labels, label_names)):
             if label_name in COCO_TO_BDD100K:
-                result["labels"].append(
+                scalabel_labels.append(
                     {
                         "id": i,
                         "category": COCO_TO_BDD100K[label_name],
@@ -210,19 +217,7 @@ class AutoAnnotation:
                     }
                 )
 
-        if len(result["labels"]) == 0:
-            return None
+        if len(scalabel_labels) == 0:
+            return []
         else:
-            return result
-
-    @staticmethod
-    def save_scalabel(result_list, save_path):
-        """保存scalabel格式的检测结果
-        如果该文件已经存在，则会覆盖原有文件
-
-        Args:
-            result_list (list(dict)): 检测结果列表
-            save_path (str): 保存路径
-        """
-        with open(save_path, "w") as f:
-            json.dump(result_list, f, indent=4)
+            return scalabel_labels
