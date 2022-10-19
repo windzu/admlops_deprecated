@@ -7,17 +7,15 @@ ADMLOPS_PATH = os.environ["ADMLOPS_PATH"]
 ###########################################
 # NOTE ： 这里使用多个coco数据集
 data_root = ADMLOPS_PATH + "/data/mmdet/COCO_TLD/"
-tld_dataset_list = ["bstld", "huawei", "shanjiaoke", "weitang"]
+dataset_list = ["bstld", "huawei", "shanjiaoke", "weitang"]
 # 遍历指定的数据集，将数据集组合成一个数据集列表
 train_ann_file_list = [
-    os.path.join(data_root, dataset, "annotations", "instances_train.json") for dataset in tld_dataset_list
+    os.path.join(data_root, dataset, "annotations", "instances_train.json") for dataset in dataset_list
 ]
-train_img_prefix_list = [os.path.join(data_root, dataset, "train") for dataset in tld_dataset_list]
+train_img_prefix_list = [os.path.join(data_root, dataset, "train") for dataset in dataset_list]
 
-val_ann_file_list = [
-    os.path.join(data_root, dataset, "annotations", "instances_val.json") for dataset in tld_dataset_list
-]
-val_img_prefix_list = [os.path.join(data_root, dataset, "val") for dataset in tld_dataset_list]
+val_ann_file_list = [os.path.join(data_root, dataset, "annotations", "instances_val.json") for dataset in dataset_list]
+val_img_prefix_list = [os.path.join(data_root, dataset, "val") for dataset in dataset_list]
 
 dataset_type = "CocoDataset"
 class_names = [
@@ -210,4 +208,6 @@ mp_start_method = "fork"
 # base_batch_size = (x GPUs) x (y samples per GPU)
 auto_scale_lr = dict(base_batch_size=64)
 
-load_from = ADMLOPS_PATH + "/checkpoints/mmdet3d/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
+load_from = os.path.join(
+    ADMLOPS_PATH, "checkpoints", "mmdet", "yolox", "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
+)
