@@ -6,8 +6,8 @@ ADMLOPS_PATH = os.environ["ADMLOPS_PATH"]
 ########### datasets settings #############
 ###########################################
 # NOTE ： 这里使用多个coco数据集
-data_root = ADMLOPS_PATH + "/data/mmdet/COCO_TLD/"
-dataset_list = ["bstld", "huawei", "shanjiaoke", "weitang"]
+data_root = ADMLOPS_PATH + "/data/mmdet/COCO_BDD100K/"
+dataset_list = ["bdd100k"]
 # 遍历指定的数据集，将数据集组合成一个数据集列表
 train_ann_file_list = [
     os.path.join(data_root, dataset, "annotations", "instances_train.json") for dataset in dataset_list
@@ -19,21 +19,41 @@ val_img_prefix_list = [os.path.join(data_root, dataset, "val") for dataset in da
 
 dataset_type = "CocoDataset"
 class_names = [
-    "green_circle",
-    "green_arrow_left",
-    "green_arrow_straight",
-    "green_arrow_right",
-    "red_circle",
-    "red_arrow_left",
-    "red_arrow_straight",
-    "red_arrow_right",
-    "yellow_circle",
-    "yellow_arrow_left",
-    "yellow_arrow_straight",
-    "yellow_arrow_right",
-    "off",
-    "unkown",
+    "pedestrian",
+    "rider",
+    "car",
+    "truck",
+    "bus",
+    "train",
+    "motorcycle",
+    "bicycle",
+    "traffic light",
+    "traffic sign",
 ]
+
+# # semantic segmentation
+# class_names = [
+#     "road",
+#     "sidewalk",
+#     "building",
+#     "wall",
+#     "fence",
+#     "pole",
+#     "traffic light",
+#     "traffic sign",
+#     "vegetation",
+#     "terrain",
+#     "sky",
+#     "person",
+#     "rider",
+#     "car",
+#     "truck",
+#     "bus",
+#     "train",
+#     "motorcycle",
+#     "bicycle",
+# ]
+
 
 img_scale = (640, 640)  # height, width
 
@@ -208,8 +228,4 @@ mp_start_method = "fork"
 # base_batch_size = (x GPUs) x (y samples per GPU)
 auto_scale_lr = dict(base_batch_size=64)
 
-# load_from = ADMLOPS_PATH + "/checkpoints/mmdet/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
-
-load_from = os.path.join(
-    ADMLOPS_PATH, "checkpoints", "mmdet", "yolox", "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
-)
+load_from = ADMLOPS_PATH + "/checkpoints/mmdet/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
