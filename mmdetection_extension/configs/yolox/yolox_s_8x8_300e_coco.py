@@ -208,8 +208,6 @@ mp_start_method = "fork"
 # base_batch_size = (x GPUs) x (y samples per GPU)
 auto_scale_lr = dict(base_batch_size=64)
 
-# load_from = ADMLOPS_PATH + "/checkpoints/mmdet/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
-
 load_from = os.path.join(
     ADMLOPS_PATH, "checkpoints", "mmdet", "yolox", "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
 )
