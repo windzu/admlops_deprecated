@@ -92,7 +92,7 @@ test_pipeline = [
 
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     persistent_workers=True,
     train=train_dataset,  # 使用了数据增强,在通用的数据集配置上加了一个wrapper
