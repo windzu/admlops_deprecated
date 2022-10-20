@@ -112,7 +112,7 @@ test_pipeline = [
 
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     persistent_workers=True,
     train=train_dataset,  # 使用了数据增强,在通用的数据集配置上加了一个wrapper
@@ -137,7 +137,7 @@ data = dict(
 ############ models settings ##############
 ###########################################
 model = dict(
-    type="YOLOX",
+    type="YOLOPV2",
     input_size=img_scale,
     random_size_range=(15, 25),
     random_size_interval=10,

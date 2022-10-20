@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import random
-import warnings
 
 import torch
 import torch.distributed as dist
@@ -8,14 +7,14 @@ import torch.nn.functional as F
 from mmcv.runner import get_dist_info
 
 from mmdet.utils import log_img_scale
-from mmdet.models.builder import DETECTORS, build_backbone, build_head, build_neck
-from mmdet.models.detectors import BaseDetector
+from mmdet.models import DETECTORS
+from mmdet.models import SingleStageDetector
 
 
 @DETECTORS.register_module()
-class YOLOPV2(BaseDetector):
-    r"""Implementation of `YOLOPV2: Exceeding YOLO Series in 2022
-    <https://arxiv.org/abs/2208.11434>`_
+class YOLOPV2(SingleStageDetector):
+    r"""Implementation of `YOLOPV2: Exceeding YOLO Series in 2021
+    <https://arxiv.org/abs/2107.08430>`_
 
     Note: Considering the trade-off between training speed and accuracy,
     multi-scale training is temporarily kept. More elegant implementation
@@ -25,12 +24,10 @@ class YOLOPV2(BaseDetector):
         backbone (nn.Module): The backbone module.
         neck (nn.Module): The neck module.
         bbox_head (nn.Module): The bbox head module.
-        lane_head (nn.Module): The lane head module.
-        drivable_head (nn.Module): The drivable head module.
         train_cfg (obj:`ConfigDict`, optional): The training config
-            of YOLOX. Default: None.
+            of YOLOPV2. Default: None.
         test_cfg (obj:`ConfigDict`, optional): The testing config
-            of YOLOX. Default: None.
+            of YOLOPV2. Default: None.
         pretrained (str, optional): model pretrained path.
             Default: None.
         input_size (tuple): The model default input image size. The shape
@@ -51,8 +48,6 @@ class YOLOPV2(BaseDetector):
         backbone,
         neck,
         bbox_head,
-        lane_head,
-        drivable_head,
         train_cfg=None,
         test_cfg=None,
         pretrained=None,
@@ -62,22 +57,7 @@ class YOLOPV2(BaseDetector):
         random_size_interval=10,
         init_cfg=None,
     ):
-        super(YOLOPV2, self).__init__(init_cfg)
-        if pretrained:
-            warnings.warn("DeprecationWarning: pretrained is deprecated, " 'please use "init_cfg" instead')
-            backbone.pretrained = pretrained
-        self.backbone = build_backbone(backbone)
-        if neck is not None:
-            self.neck = build_neck(neck)
-        bbox_head.update(train_cfg=train_cfg)
-        bbox_head.update(test_cfg=test_cfg)
-        self.bbox_head = build_head(bbox_head)
-        self.lane_head = build_head(lane_head)
-        self.drivable_head = build_head(drivable_head)
-
-        self.train_cfg = train_cfg
-        self.test_cfg = test_cfg
-
+        super(YOLOPV2, self).__init__(backbone, neck, bbox_head, train_cfg, test_cfg, pretrained, init_cfg)
         log_img_scale(input_size, skip_square=True)
         self.rank, self.world_size = get_dist_info()
         self._default_input_size = input_size
@@ -108,7 +88,7 @@ class YOLOPV2(BaseDetector):
         # Multi-scale training
         img, gt_bboxes = self._preprocess(img, gt_bboxes)
 
-        losses = super(YOLOX, self).forward_train(img, img_metas, gt_bboxes, gt_labels, gt_bboxes_ignore)
+        losses = super(YOLOPV2, self).forward_train(img, img_metas, gt_bboxes, gt_labels, gt_bboxes_ignore)
 
         # random resizing
         if (self._progress_in_iter + 1) % self._random_size_interval == 0:
