@@ -87,7 +87,7 @@ train_dataset = dict(
         classes=class_names,
         ann_file=train_ann_file_list,
         img_prefix=train_img_prefix_list,
-        pipeline=[dict(type="LoadImageFromFile"), dict(type="LoadAnnotations", with_bbox=True)],
+        pipeline=[dict(type="LoadImageFromFile"), dict(type="LoadAnnotations", with_bbox=True, with_seg=True)],
         filter_empty_gt=False,
     ),
     pipeline=train_pipeline,
