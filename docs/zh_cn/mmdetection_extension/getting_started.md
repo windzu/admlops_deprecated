@@ -8,37 +8,63 @@
 
 本工程是一个2D检测任务框架，可以帮助使用者快速的完成数据准备、模型搭建、模型训练等任务，从而提高使用者的工作效率
 
-## Supported Tasks
+## Supported
 
-本工程支持的任务如下
-- 单相机检测 (已完成)
-- 单相机分割 (已完成)
-- 单相机多任务 (开发中)
-- 多相机检测 (开发中)
-- 多相机分割 (开发中)
-- 多相机多任务 (开发中)
+### Model
 
-上述任务中，同一个任务对应多个多个网络模型，使用者可以根据自己的需求而择优选择
+- [x] YOLOPv2
 
-## Datasets
+- [ ] Nanodet
 
-本工程支持的数据集如下
-- BDD100K
-- COCO
-- VOC
-- USD (自定义数据集)
+- [ ] UFLD
 
-针对上述数据集，还提供了互相转换的脚本，详情请参考对应的具体文档
+### Tool
+
+- [x] 自动标注数据为scalabel格式
+
+- [x] ROS快速测试接口
+
+### Datasets
+
+- [x] COCO
+
+- [ ] VOC
+
+- [ ] BDD100K
+
+## Environment Configuration
+
+**v3.x**
+
+```bash
+On The Way
+```
+
+**v2.25.1**
+
+```bash
+export CONDA_ENV_NAME=mmdet2.25.1 && \
+export MMDET_TAG=2.25.1 && \
+export PYTHON_VERSION=3.8 && \
+export CUDA_VERSION=11.3 && \
+export TORCH_VERSION=1.12.0 && \
+conda create -n $CONDA_ENV_NAME python=$PYTHON_VERSION -y && \
+conda activate $CONDA_ENV_NAME && \
+conda install pytorch=$TORCH_VERSION torchvision torchaudio cudatoolkit=$CUDA_VERSION -c pytorch -y && \
+pip install openmim && \
+mim install mmcv-full && \
+cd $ADMLOPS_PATH/mmdetection && \
+git checkout v$MMDET_TAG && \
+pip install -v -e . && \
+cd $ADMLOPS_PATH/mmdetection_extension && \
+git checkout dev && \
+pip install -v -e . 
+```
 
 ## Tutorials
 
-为了方便大家快速上手使用以及提高对本工程的理解，本工程还提供了一系列保姆级教程，这些教程一般是结合自动驾驶中常见的任务而展开的，希望能给大家提供一些思路
+为了方便大家快速上手使用以及提高对本工程的理解，本工程还提供了一系列Tutorials，一般是结合自动驾驶中常见的任务而展开的，希望能给大家提供一些思路
 
-本工程提供的教程如下
-- yolox : 通过yolox完成信号灯检测
-- yolopv2 : 通过yolopv2完成目标检测、可通行区域分割、车道线分割
-
-
-如果在使用过程中发现bug或者文档错误，非常欢迎您能提issus或pr，我将在收到通知后的第一时间尽快修复
+如果在使用过程中发现bug或者文档错误，非常欢迎您能提`issus`或`pr`，我将在收到通知后的第一时间尽快修复
 
 最后，如果觉得本工程对您有帮助，希望能给一个star，我将会非常开心，感谢！

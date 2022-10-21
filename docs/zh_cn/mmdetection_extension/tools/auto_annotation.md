@@ -5,9 +5,10 @@
 ## How
 
 不同类型的数据集往往有着不同的数据格式和不同的数据标注标准，我们将自动标注划分为了如下流程
+
 - 解析待检测文件，包括但不限于
-    - 从指定文件夹读取文件
-    - 从指定配置文件读取文件
+  - 从指定文件夹读取文件
+  - 从指定配置文件读取文件
 - 构建模型检测
 - 对检测结果后处理，社区不符合目标数据集的结果
 - 保存为相应格式的标注文件
@@ -24,13 +25,11 @@ python3 main.py --input ${INPUT} --type ${TYPE} --config ${CONFIG} --checkpoint 
 
 - `input` : 待标注数据所存储路径或的配置文件路径
 - `type` : 待自动标注的数据集格式，目前支持
-    - `coco`
-    - `voc`
-    - `scalabel`
+  - `coco`
+  - `voc`
+  - `scalabel`
 - `config` : 所使用的模型的 config 文件路径
 - `checkpoint` : 所使用的模型的 checkpoint 文件路径
-
-
 
 ### Scalabel
 
@@ -44,6 +43,7 @@ Scalabel格式数据的文件列表保存在一个文件列表中，通过其中
 - `checkpoint` : 所使用的模型的 checkpoint
 
 **example**
+
 ```bash
 conda activate mmdet && \
 cd $ADMLOPS_PATH && \
@@ -61,7 +61,9 @@ python main.py \
 再使用scalabel将该文件作为url列表文件导入即可
 
 ### COCO
+
 On the way
 
 ### VOC
+
 On the way

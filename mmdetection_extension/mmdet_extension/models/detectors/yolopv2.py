@@ -1,125 +1,226 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import random
+import warnings
 
 import torch
-import torch.distributed as dist
-import torch.nn.functional as F
-from mmcv.runner import get_dist_info
 
-from mmdet.utils import log_img_scale
-from mmdet.models import DETECTORS
-from mmdet.models import SingleStageDetector
+from mmdet.models import DETECTORS, build_backbone, build_head, build_neck
+from mmdet.models import BaseDetector
 
 
 @DETECTORS.register_module()
-class YOLOPV2(SingleStageDetector):
-    r"""Implementation of `YOLOPV2: Exceeding YOLO Series in 2021
-    <https://arxiv.org/abs/2107.08430>`_
+class YOLOPV2(BaseDetector):
+    """Base class for two-stage detectors.
 
-    Note: Considering the trade-off between training speed and accuracy,
-    multi-scale training is temporarily kept. More elegant implementation
-    will be adopted in the future.
-
-    Args:
-        backbone (nn.Module): The backbone module.
-        neck (nn.Module): The neck module.
-        bbox_head (nn.Module): The bbox head module.
-        train_cfg (obj:`ConfigDict`, optional): The training config
-            of YOLOPV2. Default: None.
-        test_cfg (obj:`ConfigDict`, optional): The testing config
-            of YOLOPV2. Default: None.
-        pretrained (str, optional): model pretrained path.
-            Default: None.
-        input_size (tuple): The model default input image size. The shape
-            order should be (height, width). Default: (640, 640).
-        size_multiplier (int): Image size multiplication factor.
-            Default: 32.
-        random_size_range (tuple): The multi-scale random range during
-            multi-scale training. The real training image size will
-            be multiplied by size_multiplier. Default: (15, 25).
-        random_size_interval (int): The iter interval of change
-            image size. Default: 10.
-        init_cfg (dict, optional): Initialization config dict.
-            Default: None.
+    Two-stage detectors typically consisting of a region proposal network and a
+    task-specific regression head.
     """
 
     def __init__(
         self,
         backbone,
-        neck,
-        bbox_head,
+        neck=None,
+        drivable_head=None,
+        lane_head=None,
+        rpn_head=None,
+        roi_head=None,
         train_cfg=None,
         test_cfg=None,
         pretrained=None,
-        input_size=(640, 640),
-        size_multiplier=32,
-        random_size_range=(15, 25),
-        random_size_interval=10,
         init_cfg=None,
     ):
-        super(YOLOPV2, self).__init__(backbone, neck, bbox_head, train_cfg, test_cfg, pretrained, init_cfg)
-        log_img_scale(input_size, skip_square=True)
-        self.rank, self.world_size = get_dist_info()
-        self._default_input_size = input_size
-        self._input_size = input_size
-        self._random_size_range = random_size_range
-        self._random_size_interval = random_size_interval
-        self._size_multiplier = size_multiplier
-        self._progress_in_iter = 0
+        super(YOLOPV2, self).__init__(init_cfg)
+        if pretrained:
+            warnings.warn("DeprecationWarning: pretrained is deprecated, " 'please use "init_cfg" instead')
+            backbone.pretrained = pretrained
+        self.backbone = build_backbone(backbone)
 
-    def forward_train(self, img, img_metas, gt_bboxes, gt_labels, gt_bboxes_ignore=None):
+        if neck is not None:
+            self.neck = build_neck(neck)
+
+        if drivable_head is not None:
+            self.drivable_head = build_head(drivable_head)
+
+        if lane_head is not None:
+            self.lane_head = build_head(lane_head)
+
+        if rpn_head is not None:
+            rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
+            rpn_head_ = rpn_head.copy()
+            rpn_head_.update(train_cfg=rpn_train_cfg, test_cfg=test_cfg.rpn)
+            self.rpn_head = build_head(rpn_head_)
+
+        if roi_head is not None:
+            # update train and test cfg here for now
+            # TODO: refactor assigner & sampler
+            rcnn_train_cfg = train_cfg.rcnn if train_cfg is not None else None
+            roi_head.update(train_cfg=rcnn_train_cfg)
+            roi_head.update(test_cfg=test_cfg.rcnn)
+            roi_head.pretrained = pretrained
+            self.roi_head = build_head(roi_head)
+
+        self.train_cfg = train_cfg
+        self.test_cfg = test_cfg
+
+    @property
+    def with_neck(self):
+        """bool: whether the detector has a neck"""
+        return hasattr(self, "neck") and self.neck is not None
+
+    @property
+    def with_drivable_head(self):
+        """bool: whether the detector has a drivable head"""
+        return hasattr(self, "drivable_head") and self.drivable_head is not None
+
+    @property
+    def with_lane_head(self):
+        """bool: whether the detector has a lane head"""
+        return hasattr(self, "lane_head") and self.lane_head is not None
+
+    def extract_feat(self, img):
+        """Directly extract features from the backbone+neck."""
+        x = self.backbone(img)
+        x = self.neck(x)
+        return x
+
+    def forward_dummy(self, img):
+        """Used for computing network flops.
+
+        See `mmdetection/tools/analysis_tools/get_flops.py`
+        """
+        outs = ()
+        # backbone
+        x = self.extract_feat(img)
+        # rpn
+        if self.with_rpn:
+            rpn_outs = self.rpn_head(x)
+            outs = outs + (rpn_outs,)
+        proposals = torch.randn(1000, 4).to(img.device)
+        # roi_head
+        roi_outs = self.roi_head.forward_dummy(x, proposals)
+        outs = outs + (roi_outs,)
+        return outs
+
+    def forward_train(
+        self,
+        img,
+        img_metas,
+        gt_bboxes,
+        gt_labels,
+        gt_bboxes_ignore=None,
+        gt_masks=None,
+        proposals=None,
+        **kwargs,
+    ):
         """
         Args:
-            img (Tensor): Input images of shape (N, C, H, W).
+            img (Tensor): of shape (N, C, H, W) encoding input images.
                 Typically these should be mean centered and std scaled.
-            img_metas (list[dict]): A List of image info dict where each dict
+
+            img_metas (list[dict]): list of image info dict where each dict
                 has: 'img_shape', 'scale_factor', 'flip', and may also contain
                 'filename', 'ori_shape', 'pad_shape', and 'img_norm_cfg'.
                 For details on the values of these keys see
-                :class:`mmdet.datasets.pipelines.Collect`.
-            gt_bboxes (list[Tensor]): Each item are the truth boxes for each
-                image in [tl_x, tl_y, br_x, br_y] format.
-            gt_labels (list[Tensor]): Class indices corresponding to each box
-            gt_bboxes_ignore (None | list[Tensor]): Specify which bounding
+                `mmdet/datasets/pipelines/formatting.py:Collect`.
+
+            gt_bboxes (list[Tensor]): Ground truth bboxes for each image with
+                shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
+
+            gt_labels (list[Tensor]): class indices corresponding to each box
+
+            gt_bboxes_ignore (None | list[Tensor]): specify which bounding
                 boxes can be ignored when computing the loss.
+
+            gt_masks (None | Tensor) : true segmentation masks for each box
+                used if the architecture supports a segmentation task.
+
+            proposals : override rpn proposals with custom proposals. Use when
+                `with_rpn` is False.
+
         Returns:
-            dict[str, Tensor]: A dictionary of loss components.
+            dict[str, Tensor]: a dictionary of loss components
         """
-        # Multi-scale training
-        img, gt_bboxes = self._preprocess(img, gt_bboxes)
+        x = self.extract_feat(img)
 
-        losses = super(YOLOPV2, self).forward_train(img, img_metas, gt_bboxes, gt_labels, gt_bboxes_ignore)
+        losses = dict()
 
-        # random resizing
-        if (self._progress_in_iter + 1) % self._random_size_interval == 0:
-            self._input_size = self._random_resize(device=img.device)
-        self._progress_in_iter += 1
+        # RPN forward and loss
+        # 如果有rpn_head，就计算rpn的loss和proposals
+        # 如果没有rpn_head，就直接使用预设的proposals(暂时不知道这个proposals怎么自己预设)
+        if self.with_rpn:
+            proposal_cfg = self.train_cfg.get("rpn_proposal", self.test_cfg.rpn)
+            rpn_losses, proposal_list = self.rpn_head.forward_train(
+                x,
+                img_metas,
+                gt_bboxes,
+                gt_labels=None,  # RPN does not need gt_labels
+                gt_bboxes_ignore=gt_bboxes_ignore,
+                proposal_cfg=proposal_cfg,
+                **kwargs,
+            )
+            losses.update(rpn_losses)
+        else:
+            proposal_list = proposals
+
+        roi_losses = self.roi_head.forward_train(
+            x,
+            img_metas,
+            proposal_list,
+            gt_bboxes,
+            gt_labels,
+            gt_bboxes_ignore,
+            gt_masks,
+            **kwargs,
+        )
+        losses.update(roi_losses)
 
         return losses
 
-    def _preprocess(self, img, gt_bboxes):
-        scale_y = self._input_size[0] / self._default_input_size[0]
-        scale_x = self._input_size[1] / self._default_input_size[1]
-        if scale_x != 1 or scale_y != 1:
-            img = F.interpolate(img, size=self._input_size, mode="bilinear", align_corners=False)
-            for gt_bbox in gt_bboxes:
-                gt_bbox[..., 0::2] = gt_bbox[..., 0::2] * scale_x
-                gt_bbox[..., 1::2] = gt_bbox[..., 1::2] * scale_y
-        return img, gt_bboxes
+    async def async_simple_test(self, img, img_meta, proposals=None, rescale=False):
+        """Async test without augmentation."""
+        assert self.with_bbox, "Bbox head must be implemented."
+        x = self.extract_feat(img)
 
-    def _random_resize(self, device):
-        tensor = torch.LongTensor(2).to(device)
+        if proposals is None:
+            proposal_list = await self.rpn_head.async_simple_test_rpn(x, img_meta)
+        else:
+            proposal_list = proposals
 
-        if self.rank == 0:
-            size = random.randint(*self._random_size_range)
-            aspect_ratio = float(self._default_input_size[1]) / self._default_input_size[0]
-            size = (self._size_multiplier * size, self._size_multiplier * int(aspect_ratio * size))
-            tensor[0] = size[0]
-            tensor[1] = size[1]
+        return await self.roi_head.async_simple_test(x, proposal_list, img_meta, rescale=rescale)
 
-        if self.world_size > 1:
-            dist.barrier()
-            dist.broadcast(tensor, 0)
+    def simple_test(self, img, img_metas, proposals=None, rescale=False):
+        """Test without augmentation."""
 
-        input_size = (tensor[0].item(), tensor[1].item())
-        return input_size
+        assert self.with_bbox, "Bbox head must be implemented."
+        x = self.extract_feat(img)
+        if proposals is None:
+            proposal_list = self.rpn_head.simple_test_rpn(x, img_metas)
+        else:
+            proposal_list = proposals
+
+        return self.roi_head.simple_test(x, proposal_list, img_metas, rescale=rescale)
+
+    def aug_test(self, imgs, img_metas, rescale=False):
+        """Test with augmentations.
+
+        If rescale is False, then returned bboxes and masks will fit the scale
+        of imgs[0].
+        """
+        x = self.extract_feats(imgs)
+        proposal_list = self.rpn_head.aug_test_rpn(x, img_metas)
+        return self.roi_head.aug_test(x, proposal_list, img_metas, rescale=rescale)
+
+    def onnx_export(self, img, img_metas):
+
+        img_shape = torch._shape_as_tensor(img)[2:]
+        img_metas[0]["img_shape_for_onnx"] = img_shape
+        x = self.extract_feat(img)
+        proposals = self.rpn_head.onnx_export(x, img_metas)
+        if hasattr(self.roi_head, "onnx_export"):
+            return self.roi_head.onnx_export(x, proposals, img_metas)
+        else:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} can not "
+                f"be exported to ONNX. Please refer to the "
+                f"list of supported models,"
+                f"https://mmdetection.readthedocs.io/en/latest/tutorials/pytorch2onnx.html#list-of-supported-models-exportable-to-onnx"  # noqa E501
+            )

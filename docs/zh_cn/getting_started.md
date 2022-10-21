@@ -1,14 +1,16 @@
 # Introduction
 
-> 自动驾驶感知任务介绍
+`ADMLOps`意为用于自动驾驶感知任务的`MLOps`
 
-admlops意为用于自动驾驶感知任务的MLOps
-
-自动驾驶感知任务应该是一个闭环任务，其生命周期应该至少包括数据、模型和部署三个阶段。 因此，在MLOps的设计过程中，至少需要涵盖这三个方向。 未来将添加更多功能
+自动驾驶感知任务应该是一个闭环任务，其生命周期应该至少包括`数据`、`模型`和`部署`三个阶段。 因此，在MLOps的设计过程中，至少需要涵盖这三个方向。
 
 ## Data
 
-数据对于深度学习的重要性不言而喻，一个好的数据集应该兼顾“深度”和“广度”。 广度可以借助开源数据集和自身不断的收集来满足，而深度则需要结合实际测试，针对性分析，重新收集来完成。
+数据对于深度学习的重要性不言而喻，一个好的数据集应该兼顾“深度”和“广度”。
+
+* 广度 : 可以借助开源数据集 + 自我采集
+
+* 深度 : 需要结合实际测试，针对性分析，重新收集来完成，这类数据一般也被称为`Corner Case`
 
 ### Dataset
 
@@ -42,11 +44,11 @@ admlops意为用于自动驾驶感知任务的MLOps
 
 ## Modeling
 
-> 模型部分基于open-mmlab实验室开源的一系列优秀框架。 它可以轻松复制过去的一些经典模型，并在其基础上构建了一个新模型来验证自己的想法，感谢 open-mmlab
+模型部分基于open-mmlab实验室开源的一系列优秀框架，它可以轻松复现过去的一些经典模型，并在其基础上构建了一个新模型来验证自己的想法，感谢 open-mmlab
 
 ### 模型复现 & 框架扩展 & 网络重构
 
-根据论文和开源代码等信息，在MLOps中复制了一些自动驾驶领域的经典和前沿模型。 对于一些比较新的或者不是主流的网络结构，open-mmlab 还没有支持。 这些网络结构需要手动实现，我通常在扩展模块中编写这些实现。 另外，如果想验证自己的一些想法，可以通过简单的修改配置文件来重构模型结构，从而快速完成一些实验
+根据论文和开源代码等信息，在ADMLOps中复制了一些自动驾驶领域的经典和前沿模型。 对于一些比较新的或者不是主流的网络结构，open-mmlab 还没有支持。 这些网络结构需要手动实现，我通常在扩展模块中编写这些实现。 另外，如果想验证自己的一些想法，可以通过简单的修改配置文件来重构模型结构，从而快速完成一些实验
 
 ### 训练 & 测试 & 评估
 
@@ -62,20 +64,37 @@ admlops意为用于自动驾驶感知任务的MLOps
 
 # Preparation
 
-> 为了保证操作的一致性，请务必按照下述步骤完成相关的准备工作
+> Note 为了保证操作的一致性，请按照下述步骤完成相关的准备工作
 
-## 大文件存储文件夹
+### 数据管理
 
-> checkpoint 、训练数据等大文件计划通过软链接至工程当中
+在磁盘中按照如下名称和结构设置两个文件夹，分别用于存储数据集和模型
+
+**Dataset文件夹**
 
 ```bash
-admlops_repository
-├── checkpoints
-│   ├── mmdet
-│   ├── mmdet3d
-└── data
-    ├── mmdet
-    ├── mmdet3d
+Dataset
+├── ApolloScape
+├── BDD100K
+├── COCO
+├── nuScenes
+├── KITTI
+├── CULane
+├── VOC
+...
+```
+
+**ModelZoo文件夹**
+
+```bash
+ModelZoo
+├── centerpoint
+├── faster_rcnn
+├── fcos3d
+├── pointpillars
+├── yolo
+├── yolox
+...
 ```
 
 # General Configuration
@@ -90,26 +109,24 @@ git submodule update --init --recursive
 
 ## 添加环境变量
 
-> 为了后续的方便，请务必添加，根据自己的shell选择.bashrc 或者.zshrc之类的
+> Note 根据自己的shell选择`.bashrc` 或者`.zshrc`,将如下环境变量添加到其中
 
 ```bash
-# 添加工程路径
-cd admlops && \
-echo "export ADMLOPS_PATH=$(pwd)" >> ~/.zshrc
-
-# 添加存储库路径
-cd admlops_repository && \
-echo "export ADMLOPS_REP_PATH=$(pwd)" >> ~/.zshrc
+export ADMLOPS=xxx/admlops
+export DATASET=xxx/Dataset
+export MODELZOO=xxx/ModelZoo
 ```
 
 ## 添加数据软链接
 
-> 注意 ： 数据软链接在docker环境下是不奏效的，所以如果是通过docker进行环境的配置，需要通过volume参数将数据文件夹挂载进去
+> Note 数据软链接在docker环境下无效，需要使用docker挂载
 
 ```bash
-ln -s $ADMLOPS_REP_PATH/checkpoints $ADMLOPS_PATH && \
-ln -s $ADMLOPS_REP_PATH/data $ADMLOPS_PATH
+ln -s $DATASET $ADMLOPS/data
+ln -s $MODELZOO $ADMLOPS/checkpoints
 ```
+
+至此准备工作全部完成 ！！！
 
 # Development Environment Setup
 
@@ -119,33 +136,9 @@ ln -s $ADMLOPS_REP_PATH/data $ADMLOPS_PATH
 - 对于主要使用的开发环境，通过源码安装，这样更方便查看源码，以便对照结构添加extension，这也是在工程中添加submodule的原因。例如配置mmdetetion3d环境，mmdetection3d通过其源码编译安装，但是对于其依赖的mmdetetion和mmcv，直接通过mim安装即可，这样也可以保证版本不会冲突
 - 环境配置与与系统版本和cuda版本相关，根据需求选择合适的安装脚本
 
-## mmdetection (conda)
+具体的开发环境配置请查看各个子章节中的内容
 
-### Ubuntu18.04+CUDA10.2
-
-```bash
-# on the way
-```
-
-### Ubuntu20.04+CUDA11.3
-
-```bash
-export CONDA_ENV_NAME=mmdet && \
-export PYTHON_VERSION=3.8 && \
-export CUDA_VERSION=11.3 && \
-export TORCH_VERSION=1.12.0 && \
-conda create -n $CONDA_ENV_NAME python=$PYTHON_VERSION -y && \
-conda activate $CONDA_ENV_NAME && \
-conda install pytorch=$TORCH_VERSION torchvision torchaudio cudatoolkit=$CUDA_VERSION -c pytorch -y && \
-pip install openmim && \
-mim install mmcv-full && \
-cd $ADMLOPS_PATH/mmdetection && \
-pip install -e . && \
-cd $ADMLOPS_PATH/mmdetection_extension && \
-pip install -e . 
-```
-
-## mmdetection3d (conda)
+### mmdetection3d (conda)
 
 ### Ubuntu18.04+CUDA10.2
 
@@ -174,76 +167,4 @@ cd $ADMLOPS_PATH/mmdetection3d && \
 pip install -e . && \
 cd $ADMLOPS_PATH/mmdetection3d_extension && \
 pip install -e .
-```
-
-## mmdeploy (docker)
-
-> 分两个步骤，build docker image 和 create docker container
-
-### build image
-
-> 在mmdeploy的dockerfile基础上添加了一些内容，具体内容在mmdeploy_extension/docker/GPU下的dockerfile中，里面有详细的说明
-
-```bash
-cd $ADMLOPS_PATH/mmdeploy_extension && \
-docker build docker/GPU -t mmdeploy:main \
---build-arg USE_SRC_INSIDE=true 
-```
-
-### create container
-
-> docker-compose中做了一些环境变量和网络的相关设置,具体内容在mmdeploy_extension/docker-compose.yml文件中有详细说明
-
-> note：如果该环境仅仅是用于测试，而不需要结合ros进行部署使用，可以参照如下，如果不是，请参照下一小段中的的docker网络配置，需要修改一下docker-compose
-
-```bash
-cd $ADMLOPS_PATH/mmdeploy_extension && \
-docker-compose up -d 
-```
-
-# Deployment Environment Setup
-
-> 如果还需要基于此docker进行部署，则还有一些额外设置，内容如下
-
-- container需要与主机配置主从机器：这需要主机创建bridge网络并指定网段，container在创建的时候要指定网络以及自己的ip
-- 在container和host中添加ros的主从机配置
-
-## 创建docker bridge网络
-
-- 网络类型：bridge
-- 网段：172.28.0.0
-
-```bash
-docker network create \
-  --driver=bridge \
-  --subnet=172.28.0.0/16 \
-  admlops
-```
-
-## docker-compose中指定网络并设置ip
-
-```bash
-services:
-  mmdeploy:
-    networks:
-      - admlops
-
-# use alread existing network
-networks:
-  admlops:
-    external: true
-```
-
-## container中设置主从机
-
-> 因为container只有一个ip 所以直接获取其地址填入中，而不是通过手动分配固定地址的方式
-
-```bash
-# 1. 进入container
-docker exec -it mmdeploy /bin/bash
-
-# 2. 设置主从机
-echo export ROS_IP=`hostname -I` >> ~/.bashrc && \
-echo export ROS_HOSTNAME=`hostname -I` >> ~/.bashrc && \
-echo export ROS_MASTER_URI=http://172.28.0.1:11311 >> ~/.bashrc
 ```

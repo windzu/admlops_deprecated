@@ -1,12 +1,10 @@
 import os
 
-ADMLOPS_PATH = os.environ["ADMLOPS_PATH"]
-
 ###########################################
 ########### datasets settings #############
 ###########################################
 # NOTE ： 这里使用多个coco数据集
-data_root = ADMLOPS_PATH + "/data/mmdet/COCO_TLD/"
+data_root = os.path.join(os.environ["ADMLOPS"], "data", "COCO_TLD")
 dataset_list = ["bstld", "huawei", "shanjiaoke", "weitang"]
 # 遍历指定的数据集，将数据集组合成一个数据集列表
 train_ann_file_list = [

@@ -1,40 +1,11 @@
 import os
 
-ADMLOPS_PATH = os.environ["ADMLOPS_PATH"]
-
 ###########################################
 ########### datasets settings #############
 ###########################################
-# NOTE ： 这里使用多个coco数据集
-data_root = ADMLOPS_PATH + "/data/mmdet/COCO_LANE/"
-dataset_list = ["bstld", "huawei", "shanjiaoke", "weitang"]
-# 遍历指定的数据集，将数据集组合成一个数据集列表
-train_ann_file_list = [
-    os.path.join(data_root, dataset, "annotations", "instances_train.json") for dataset in dataset_list
-]
-train_img_prefix_list = [os.path.join(data_root, dataset, "train") for dataset in dataset_list]
-
-val_ann_file_list = [os.path.join(data_root, dataset, "annotations", "instances_val.json") for dataset in dataset_list]
-val_img_prefix_list = [os.path.join(data_root, dataset, "val") for dataset in dataset_list]
-
+data_root = os.path.join(os.environ["ADMLOPS"], "data", "COCO_BDD10K")
 dataset_type = "CocoDataset"
-class_names = [
-    "green_circle",
-    "green_arrow_left",
-    "green_arrow_straight",
-    "green_arrow_right",
-    "red_circle",
-    "red_arrow_left",
-    "red_arrow_straight",
-    "red_arrow_right",
-    "yellow_circle",
-    "yellow_arrow_left",
-    "yellow_arrow_straight",
-    "yellow_arrow_right",
-    "off",
-    "unkown",
-]
-
+class_names = ["pedestrian", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"]
 img_scale = (640, 640)  # height, width
 
 # 配置 pipeline 和 dataset
@@ -60,20 +31,6 @@ train_pipeline = [
     dict(type="Collect", keys=["img", "gt_bboxes", "gt_labels"]),
 ]
 
-train_dataset = dict(
-    type="MultiImageMixDataset",
-    dataset=dict(
-        type=dataset_type,
-        classes=class_names,
-        ann_file=train_ann_file_list,
-        img_prefix=train_img_prefix_list,
-        pipeline=[dict(type="LoadImageFromFile"), dict(type="LoadAnnotations", with_bbox=True)],
-        filter_empty_gt=False,
-    ),
-    pipeline=train_pipeline,
-)
-
-
 test_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(
@@ -92,22 +49,33 @@ test_pipeline = [
 
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     persistent_workers=True,
-    train=train_dataset,  # 使用了数据增强,在通用的数据集配置上加了一个wrapper
+    train=dict(
+        type="MultiImageMixDataset",
+        dataset=dict(
+            type=dataset_type,
+            classes=class_names,
+            ann_file=os.path.join(data_root, "annotations", "instances_train.json"),
+            img_prefix=os.path.join(data_root, "train"),
+            pipeline=[dict(type="LoadImageFromFile"), dict(type="LoadAnnotations", with_bbox=True)],
+            filter_empty_gt=False,
+        ),
+        pipeline=train_pipeline,
+    ),
     val=dict(
         type=dataset_type,
         classes=class_names,
-        ann_file=val_ann_file_list,
-        img_prefix=val_img_prefix_list,
+        ann_file=os.path.join(data_root, "annotations", "instances_val.json"),
+        img_prefix=os.path.join(data_root, "val"),
         pipeline=test_pipeline,
     ),
     test=dict(
         type=dataset_type,
         classes=class_names,
-        ann_file=val_ann_file_list,
-        img_prefix=val_img_prefix_list,
+        ann_file=os.path.join(data_root, "annotations", "instances_val.json"),
+        img_prefix=os.path.join(data_root, "val"),
         pipeline=test_pipeline,
     ),
 )
@@ -117,59 +85,22 @@ data = dict(
 ############ models settings ##############
 ###########################################
 model = dict(
-    type="YOLOW",
+    type="YOLOX",
     input_size=img_scale,
     random_size_range=(15, 25),
     random_size_interval=10,
     backbone=dict(type="CSPDarknet", deepen_factor=0.33, widen_factor=0.5),
-    neck=dict(type="YOLOXPAFPN", in_channels=[128, 256, 512], out_channels=128, num_csp_blocks=1),
-    head=dict(type="YOLOXHead", num_classes=len(class_names), in_channels=128, feat_channels=128),
-    train_cfg=dict(assigner=dict(type="SimOTAAssigner", center_radius=2.5)),
-    # In order to align the source code, the threshold of the val phase is
-    # 0.01, and the threshold of the test phase is 0.001.
-    test_cfg=dict(score_thr=0.01, nms=dict(type="nms", iou_threshold=0.65)),
-)
-
-
-model = dict(
-    type="YOLOW",
-    backbone=dict(
-        type="ResNet",
-        depth=50,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
-        norm_cfg=dict(type="BN", requires_grad=True),
-        norm_eval=True,
-        style="pytorch",
-        init_cfg=dict(type="Pretrained", checkpoint="torchvision://resnet50"),
+    neck=dict(
+        type="YOLOXPAFPN",
+        in_channels=[128, 256, 512],
+        out_channels=128,
+        num_csp_blocks=1,
     ),
-    neck=dict(type="FPN", in_channels=[256, 512, 1024, 2048], out_channels=256, num_outs=5),
     bbox_head=dict(
-        type="Shared2FCBBoxHead",
-        in_channels=256,
-        fc_out_channels=1024,
-        roi_feat_size=7,
-        num_classes=80,
-        bbox_coder=dict(type="DeltaXYWHBBoxCoder", target_means=[0.0, 0.0, 0.0, 0.0], target_stds=[0.1, 0.1, 0.2, 0.2]),
-        reg_class_agnostic=False,
-        loss_cls=dict(type="CrossEntropyLoss", use_sigmoid=False, loss_weight=1.0),
-        loss_bbox=dict(type="L1Loss", loss_weight=1.0),
-    ),
-    mask_head=dict(
-        type="FCNMaskHead",
-        num_convs=4,
-        in_channels=256,
-        conv_out_channels=256,
-        num_classes=80,
-        loss_mask=dict(type="CrossEntropyLoss", use_mask=True, loss_weight=1.0),
-    ),
-    lane_head=dict(
-        type="UFLDHead",
-        in_channels=256,
-        num_classes=4,
-        dims=(101, 56, 4),  # (w,h,c) 最终输出的维度
-        loss_cls=dict(type="CrossEntropyLoss", use_sigmoid=False, loss_weight=1.0),
+        type="YOLOXHead",
+        num_classes=len(class_names),
+        in_channels=128,
+        feat_channels=128,
     ),
     train_cfg=dict(assigner=dict(type="SimOTAAssigner", center_radius=2.5)),
     # In order to align the source code, the threshold of the val phase is
@@ -255,4 +186,9 @@ mp_start_method = "fork"
 # base_batch_size = (x GPUs) x (y samples per GPU)
 auto_scale_lr = dict(base_batch_size=64)
 
-load_from = ADMLOPS_PATH + "/checkpoints/mmdet3d/yolox/" + "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth"
+load_from = os.path.join(
+    os.environ["ADMLOPS"],
+    "checkpoints",
+    "yolox",
+    "yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth",
+)
