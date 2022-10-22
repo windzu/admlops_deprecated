@@ -89,10 +89,24 @@ model = dict(
     input_size=img_scale,
     random_size_range=(15, 25),
     random_size_interval=10,
-    backbone=dict(type="CSPDarknet", deepen_factor=0.33, widen_factor=0.5),
+    backbone=dict(
+        # CSPDarknet 默认使用 P5 结构
+        # 其结构如下：
+        # [
+        #   p4 [512, 1024, 3, False, True]
+        #   p3 [256, 512, 9, True, False],
+        #   p2 [128, 256, 9, True, False],
+        #   p1 [64, 128, 3, True, False],
+        # ]
+        # 其中，每个元素的含义为：
+        # [ in_channels, out_channels, num_blocks, add_identity, use_spp ]
+        type="CSPDarknet",
+        deepen_factor=0.33,  # 深度因子，用于调整 CSPDarknet 的深度
+        widen_factor=0.5,  # 宽度因子，用于调整 CSPDarknet 的宽度
+    ),
     neck=dict(
         type="YOLOXPAFPN",
-        in_channels=[128, 256, 512],
+        in_channels=[128, 256, 512],  # 输入的每个scale的channel数
         out_channels=128,
         num_csp_blocks=1,
     ),
