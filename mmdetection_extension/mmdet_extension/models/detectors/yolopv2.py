@@ -19,44 +19,29 @@ class YOLOPV2(BaseDetector):
         self,
         backbone,
         neck=None,
+        bbox_head=None,
         drivable_head=None,
         lane_head=None,
-        rpn_head=None,
-        roi_head=None,
         train_cfg=None,
         test_cfg=None,
         pretrained=None,
         init_cfg=None,
     ):
         super(YOLOPV2, self).__init__(init_cfg)
-        if pretrained:
-            warnings.warn("DeprecationWarning: pretrained is deprecated, " 'please use "init_cfg" instead')
-            backbone.pretrained = pretrained
+
         self.backbone = build_backbone(backbone)
+        self.neck = build_neck(neck)
+        self.drivable_head = build_head(drivable_head)
+        self.lane_head = build_head(lane_head)
 
-        if neck is not None:
-            self.neck = build_neck(neck)
-
-        if drivable_head is not None:
-            self.drivable_head = build_head(drivable_head)
-
-        if lane_head is not None:
-            self.lane_head = build_head(lane_head)
-
-        if rpn_head is not None:
-            rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
-            rpn_head_ = rpn_head.copy()
-            rpn_head_.update(train_cfg=rpn_train_cfg, test_cfg=test_cfg.rpn)
-            self.rpn_head = build_head(rpn_head_)
-
-        if roi_head is not None:
+        if bbox_head is not None:
             # update train and test cfg here for now
             # TODO: refactor assigner & sampler
             rcnn_train_cfg = train_cfg.rcnn if train_cfg is not None else None
-            roi_head.update(train_cfg=rcnn_train_cfg)
-            roi_head.update(test_cfg=test_cfg.rcnn)
-            roi_head.pretrained = pretrained
-            self.roi_head = build_head(roi_head)
+            bbox_head.update(train_cfg=rcnn_train_cfg)
+            bbox_head.update(test_cfg=test_cfg.rcnn)
+            bbox_head.pretrained = pretrained
+            self.bbox_head = build_head(bbox_head)
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
@@ -108,7 +93,6 @@ class YOLOPV2(BaseDetector):
         gt_labels,
         gt_bboxes_ignore=None,
         gt_masks=None,
-        proposals=None,
         **kwargs,
     ):
         """
@@ -133,9 +117,6 @@ class YOLOPV2(BaseDetector):
             gt_masks (None | Tensor) : true segmentation masks for each box
                 used if the architecture supports a segmentation task.
 
-            proposals : override rpn proposals with custom proposals. Use when
-                `with_rpn` is False.
-
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
@@ -143,35 +124,34 @@ class YOLOPV2(BaseDetector):
 
         losses = dict()
 
-        # RPN forward and loss
-        # 如果有rpn_head，就计算rpn的loss和proposals
-        # 如果没有rpn_head，就直接使用预设的proposals(暂时不知道这个proposals怎么自己预设)
-        if self.with_rpn:
-            proposal_cfg = self.train_cfg.get("rpn_proposal", self.test_cfg.rpn)
-            rpn_losses, proposal_list = self.rpn_head.forward_train(
-                x,
-                img_metas,
-                gt_bboxes,
-                gt_labels=None,  # RPN does not need gt_labels
-                gt_bboxes_ignore=gt_bboxes_ignore,
-                proposal_cfg=proposal_cfg,
-                **kwargs,
-            )
-            losses.update(rpn_losses)
-        else:
-            proposal_list = proposals
-
-        roi_losses = self.roi_head.forward_train(
+        bbox_losses = self.bbox_head.forward_train(
             x,
             img_metas,
-            proposal_list,
+            gt_bboxes,
+            gt_labels,
+            gt_bboxes_ignore,
+        )
+        losses.update(bbox_losses)
+
+        drivable_losses = self.drivable_head.forward_train(
+            x,
+            img_metas,
             gt_bboxes,
             gt_labels,
             gt_bboxes_ignore,
             gt_masks,
-            **kwargs,
         )
-        losses.update(roi_losses)
+        losses.update(drivable_losses)
+
+        lane_losses = self.lane_head.forward_train(
+            x,
+            img_metas,
+            gt_bboxes,
+            gt_labels,
+            gt_bboxes_ignore,
+            gt_masks,
+        )
+        losses.update(lane_losses)
 
         return losses
 
@@ -180,24 +160,15 @@ class YOLOPV2(BaseDetector):
         assert self.with_bbox, "Bbox head must be implemented."
         x = self.extract_feat(img)
 
-        if proposals is None:
-            proposal_list = await self.rpn_head.async_simple_test_rpn(x, img_meta)
-        else:
-            proposal_list = proposals
-
-        return await self.roi_head.async_simple_test(x, proposal_list, img_meta, rescale=rescale)
+        return await self.bbox_head.async_simple_test(x, img_meta, rescale=rescale)
 
     def simple_test(self, img, img_metas, proposals=None, rescale=False):
         """Test without augmentation."""
 
         assert self.with_bbox, "Bbox head must be implemented."
         x = self.extract_feat(img)
-        if proposals is None:
-            proposal_list = self.rpn_head.simple_test_rpn(x, img_metas)
-        else:
-            proposal_list = proposals
 
-        return self.roi_head.simple_test(x, proposal_list, img_metas, rescale=rescale)
+        return self.bbox_head.simple_test(x, img_metas, rescale=rescale)
 
     def aug_test(self, imgs, img_metas, rescale=False):
         """Test with augmentations.

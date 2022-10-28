@@ -23,7 +23,6 @@ from mmdet.utils import (
     get_root_logger,
     replace_cfg_vals,
     setup_multi_processes,
-    update_data_root,
 )
 
 # local
@@ -42,17 +41,6 @@ def parse_args():
     )
     group_gpus = parser.add_mutually_exclusive_group()
     group_gpus.add_argument(
-        "--gpus",
-        type=int,
-        help="(Deprecated, please use --gpu-id) number of gpus to use " "(only applicable to non-distributed training)",
-    )
-    group_gpus.add_argument(
-        "--gpu-ids",
-        type=int,
-        nargs="+",
-        help="(Deprecated, please use --gpu-id) ids of gpus to use " "(only applicable to non-distributed training)",
-    )
-    group_gpus.add_argument(
         "--gpu-id", type=int, default=0, help="id of gpu to use " "(only applicable to non-distributed training)"
     )
     parser.add_argument("--seed", type=int, default=None, help="random seed")
@@ -61,14 +49,6 @@ def parse_args():
     )
     parser.add_argument(
         "--deterministic", action="store_true", help="whether to set deterministic options for CUDNN backend."
-    )
-    parser.add_argument(
-        "--options",
-        nargs="+",
-        action=DictAction,
-        help="override some settings in the used config, the key-value pair "
-        "in xxx=yyy format will be merged into config file (deprecate), "
-        "change to --cfg-options instead.",
     )
     parser.add_argument(
         "--cfg-options",
@@ -88,27 +68,15 @@ def parse_args():
     if "LOCAL_RANK" not in os.environ:
         os.environ["LOCAL_RANK"] = str(args.local_rank)
 
-    if args.options and args.cfg_options:
-        raise ValueError(
-            "--options and --cfg-options cannot be both " "specified, --options is deprecated in favor of --cfg-options"
-        )
-    if args.options:
-        warnings.warn("--options is deprecated in favor of --cfg-options")
-        args.cfg_options = args.options
-
     return args
 
 
 def main():
     args = parse_args()
-
     cfg = Config.fromfile(args.config)
 
     # replace the ${key} with the value of cfg.key
     cfg = replace_cfg_vals(cfg)
-
-    # update data root according to MMDET_DATASETS
-    update_data_root(cfg)
 
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
@@ -126,6 +94,7 @@ def main():
             )
 
     # set multi-process settings
+    # 通过 config 中 workers_per_gpu 设置多线程数
     setup_multi_processes(cfg)
 
     # set cudnn_benchmark
@@ -133,6 +102,8 @@ def main():
         torch.backends.cudnn.benchmark = True
 
     # work_dir is determined in this priority: CLI > segment in file > filename
+    # 保存路径设置
+    # 从参数或者配置文件中读取保存路径，如果没有则默认
     if args.work_dir is not None:
         # update configs according to CLI args if args.work_dir is not None
         cfg.work_dir = args.work_dir
@@ -140,28 +111,17 @@ def main():
         # use config filename as default work_dir if cfg.work_dir is None
         cfg.work_dir = osp.join("./work_dirs", osp.splitext(osp.basename(args.config))[0])
 
+    # resume设置
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
     cfg.auto_resume = args.auto_resume
-    if args.gpus is not None:
-        cfg.gpu_ids = range(1)
-        warnings.warn(
-            "`--gpus` is deprecated because we only support "
-            "single GPU mode in non-distributed training. "
-            "Use `gpus=1` now."
-        )
-    if args.gpu_ids is not None:
-        cfg.gpu_ids = args.gpu_ids[0:1]
-        warnings.warn(
-            "`--gpu-ids` is deprecated, please use `--gpu-id`. "
-            "Because we only support single GPU mode in "
-            "non-distributed training. Use the first GPU "
-            "in `gpu_ids` now."
-        )
-    if args.gpus is None and args.gpu_ids is None:
-        cfg.gpu_ids = [args.gpu_id]
+
+    # 单卡gpu id设置
+    cfg.gpu_ids = [args.gpu_id]
 
     # init distributed env first, since logger depends on the dist info.
+    # 借助pytorch、slurm、mpi等工具可以进行分布式训练
+    # 在这里进行判断和初始化
     if args.launcher == "none":
         distributed = False
     else:
@@ -174,8 +134,11 @@ def main():
     # create work_dir
     mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
     # dump config
+    # 将配置文件保存到work_dir路径下
     cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
+
     # init the logger before other steps
+    # 初始化logger
     timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     log_file = osp.join(cfg.work_dir, f"{timestamp}.log")
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
@@ -204,9 +167,11 @@ def main():
     meta["seed"] = seed
     meta["exp_name"] = osp.basename(args.config)
 
-    model = build_detector(cfg.model, train_cfg=cfg.get("train_cfg"), test_cfg=cfg.get("test_cfg"))
+    # 根据model config 构建 model
+    model = build_detector(cfg.model)
     model.init_weights()
 
+    # 根据dataset config 构建 dataset
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -215,11 +180,22 @@ def main():
     if cfg.checkpoint_config is not None:
         # save mmdet version, config file content and class names in
         # checkpoints as meta data
-        cfg.checkpoint_config.meta = dict(mmdet_version=__version__ + get_git_hash()[:7], CLASSES=datasets[0].CLASSES)
+        cfg.checkpoint_config.meta = dict(
+            mmdet_version=__version__ + get_git_hash()[:7],
+            CLASSES=datasets[0].CLASSES,
+        )
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
+
+    # start train
     train_detector(
-        model, datasets, cfg, distributed=distributed, validate=(not args.no_validate), timestamp=timestamp, meta=meta
+        model,
+        datasets,
+        cfg,
+        distributed=distributed,
+        validate=(not args.no_validate),
+        timestamp=timestamp,
+        meta=meta,
     )
 
 

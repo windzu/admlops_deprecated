@@ -6,12 +6,13 @@ import os
 data_root = os.path.join(os.environ["ADMLOPS"], "data", "COCO_BDD10K")
 dataset_type = "CocoDataset"
 class_names = ["pedestrian", "rider", "car", "truck", "bus", "train", "motorcycle", "bicycle"]
+img_scale = (640, 640)  # height, width
 
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 train_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(type="LoadAnnotations", with_bbox=True, with_mask=True),
-    dict(type="Resize", img_scale=(1333, 800), keep_ratio=True),
+    dict(type="Resize", img_scale=img_scale, keep_ratio=True),
     dict(type="RandomFlip", flip_ratio=0.5),
     dict(type="Normalize", **img_norm_cfg),
     dict(type="Pad", size_divisor=32),
@@ -22,7 +23,7 @@ test_pipeline = [
     dict(type="LoadImageFromFile"),
     dict(
         type="MultiScaleFlipAug",
-        img_scale=(1333, 800),
+        img_scale=img_scale,
         flip=False,
         transforms=[
             dict(type="Resize", keep_ratio=True),
@@ -65,137 +66,56 @@ evaluation = dict(metric=["bbox", "segm"])
 # model settings
 model = dict(
     type="YOLOPV2",
+    input_size=img_scale,  # 网络输入尺寸
+    random_size_range=(15, 25),  # 多尺度训练时随机乘以的尺度范围
+    random_size_interval=10,  # 多尺度训练时在尺度变化中变化的间隔
     backbone=dict(
-        type="ResNet",  # backbone 类型为 ResNet
-        depth=50,  # ResNet常用深度为{18, 34, 50, 101, 152}，这里使用50层
-        num_stages=4,  # 其对应 (Bottleneck, (3, 4, 6, 3))
-        out_indices=(0, 1, 2, 3),  # 输出的 stage 索引
-        frozen_stages=1,  # 冻结的 stage 索引
-        norm_cfg=dict(type="BN", requires_grad=True),  # BN 层配置
-        norm_eval=True,  # eval时是否冻结 BN 层
-        style="pytorch",
-        init_cfg=dict(type="Pretrained", checkpoint="torchvision://resnet50"),
+        # CSPDarknet 默认使用 P5 结构
+        # 其结构如下：
+        # [
+        #   p4 [512, 1024, 3, False, True]
+        #   p3 [256, 512, 9, True, False],
+        #   p2 [128, 256, 9, True, False],
+        #   p1 [64, 128, 3, True, False],
+        # ]
+        # 其中，每个元素的含义为：
+        # [ in_channels, out_channels, num_blocks, add_identity, use_spp ]
+        type="CSPDarknet",
+        deepen_factor=0.33,  # 深度因子，用于调整 CSPDarknet 的深度
+        widen_factor=0.5,  # 宽度因子，用于调整 CSPDarknet 的宽度
     ),
     neck=dict(
-        type="FPN",  # neck 类型为 FPN
-        in_channels=[256, 512, 1024, 2048],  # 每个尺度下输入的通道数，这里与 ResNet50 对应
-        out_channels=256,  # 每个尺度下输出的通道数
-        num_outs=5,  # 输出的特征图数量
+        type="YOLOXPAFPN",
+        in_channels=[128, 256, 512],  # 输入的每个scale的channel数,与backbone的out_channels对应
+        out_channels=128,  # 输出的channel数
+        num_csp_blocks=1,
     ),
-    rpn_head=dict(
-        type="RPNHead",
-        in_channels=256,  # 输入feat的通道数，与 FPN 输出的通道数对应
-        feat_channels=256,  # RPNHead 中间层的通道数
-        anchor_generator=dict(
-            type="AnchorGenerator",
-            scales=[8],
-            ratios=[0.5, 1.0, 2.0],
-            strides=[4, 8, 16, 32, 64],
-        ),
-        bbox_coder=dict(
-            type="DeltaXYWHBBoxCoder",
-            target_means=[0.0, 0.0, 0.0, 0.0],
-            target_stds=[1.0, 1.0, 1.0, 1.0],
-        ),
-        loss_cls=dict(
-            type="CrossEntropyLoss",
-            use_sigmoid=True,
-            loss_weight=1.0,
-        ),
-        loss_bbox=dict(type="L1Loss", loss_weight=1.0),
+    bbox_head=dict(
+        type="YOLOXHead",
+        num_classes=len(class_names),
+        in_channels=128,  # neck的输出channel数
+        feat_channels=128,  # 在stacked conv中间的channel数
     ),
-    roi_head=dict(
-        type="StandardRoIHead",
-        bbox_roi_extractor=dict(  # 根据 RoI 从特征图中提取 RoI 特征
-            type="SingleRoIExtractor",  # 从单尺度的特征图中提取 RoI，如果输入是多尺度的特征图，则根据其对应的尺度映射提取
-            roi_layer=dict(
-                type="RoIAlign",  # 使用 RoIAlign 对齐所提取的特征图
-                output_size=7,  # 输出的特征图大小为 7x7
-                sampling_ratio=0,  # 采样率
-            ),
-            out_channels=256,  # 输出的通道数为 256
-            featmap_strides=[4, 8, 16, 32],  # 对应的特征图的 stride
-        ),
-        bbox_head=dict(  # bbox_head 包含两个分支，一个是分类分支，一个是回归分支
-            #                             /-> cls convs -> cls fcs -> cls
-            # shared convs -> shared fcs
-            #                             \-> reg convs -> reg fcs -> reg
-            type="Shared2FCBBoxHead",  # 使用shared head,包含 0个conv -> 2个fc,然后分别进行分类和回归
-            in_channels=256,  # 输入的特征图通道数为 256，与 bbox_roi_extractor 输出的通道数对应
-            fc_out_channels=1024,  # fc层的输出通道数
-            roi_feat_size=7,  # RoI 特征图大小为 7x7
-            num_classes=80,  # 类别数为 80
-            bbox_coder=dict(
-                type="DeltaXYWHBBoxCoder",
-                target_means=[0.0, 0.0, 0.0, 0.0],
-                target_stds=[0.1, 0.1, 0.2, 0.2],
-            ),
-            reg_class_agnostic=False,
-            loss_cls=dict(type="CrossEntropyLoss", use_sigmoid=False, loss_weight=1.0),
-            loss_bbox=dict(type="L1Loss", loss_weight=1.0),
-        ),
-        mask_roi_extractor=dict(
-            type="SingleRoIExtractor",
-            roi_layer=dict(type="RoIAlign", output_size=14, sampling_ratio=0),
-            out_channels=256,
-            featmap_strides=[4, 8, 16, 32],
-        ),
-        mask_head=dict(
-            type="FCNMaskHead",  # 通过FCN进行mask预测
-            num_convs=4,  # 4个卷积层
-            in_channels=256,  # 输入特征的通道数
-            conv_out_channels=256,  # 卷积层输出的通道数
-            num_classes=80,
-            loss_mask=dict(type="CrossEntropyLoss", use_mask=True, loss_weight=1.0),
-        ),
+    drivable_head=dict(
+        type="FCNMaskHead",  # 通过FCN进行mask预测
+        num_convs=4,  # 4个卷积层
+        in_channels=128,  # 输入特征的通道数
+        conv_out_channels=256,  # 卷积层输出的通道数
+        num_classes=80,
+        loss_mask=dict(type="CrossEntropyLoss", use_mask=True, loss_weight=1.0),
     ),
-    # model training and testing settings
-    train_cfg=dict(
-        rpn=dict(
-            assigner=dict(
-                type="MaxIoUAssigner",
-                pos_iou_thr=0.7,
-                neg_iou_thr=0.3,
-                min_pos_iou=0.3,
-                match_low_quality=True,
-                ignore_iof_thr=-1,
-            ),
-            sampler=dict(
-                type="RandomSampler",
-                num=256,
-                pos_fraction=0.5,
-                neg_pos_ub=-1,
-                add_gt_as_proposals=False,
-            ),
-            allowed_border=-1,
-            pos_weight=-1,
-            debug=False,
-        ),
-        rpn_proposal=dict(  # rpn网络中proposal的配置
-            nms_pre=2000,  # nms操作前，通过score筛选的proposal数量，然后取前topk个有效结果，这里topk为2000
-            max_per_img=1000,  # nms操作后，最终保留的proposal数量，这里为1000
-            nms=dict(type="nms", iou_threshold=0.7),  # nms操作中的iou阈值
-            min_bbox_size=0,
-        ),
-        rcnn=dict(
-            assigner=dict(
-                type="MaxIoUAssigner",
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
-                min_pos_iou=0.5,
-                match_low_quality=True,
-                ignore_iof_thr=-1,
-            ),
-            sampler=dict(type="RandomSampler", num=512, pos_fraction=0.25, neg_pos_ub=-1, add_gt_as_proposals=True),
-            mask_size=28,
-            pos_weight=-1,
-            debug=False,
-        ),
+    lane_head=dict(
+        type="FCNMaskHead",  # 通过FCN进行mask预测
+        num_convs=4,  # 4个卷积层
+        in_channels=128,  # 输入特征的通道数
+        conv_out_channels=256,  # 卷积层输出的通道数
+        num_classes=80,
+        loss_mask=dict(type="CrossEntropyLoss", use_mask=True, loss_weight=1.0),
     ),
-    test_cfg=dict(
-        rpn=dict(nms_pre=1000, max_per_img=1000, nms=dict(type="nms", iou_threshold=0.7), min_bbox_size=0),
-        rcnn=dict(score_thr=0.05, nms=dict(type="nms", iou_threshold=0.5), max_per_img=100, mask_thr_binary=0.5),
-    ),
+    train_cfg=dict(assigner=dict(type="SimOTAAssigner", center_radius=2.5)),
+    # In order to align the source code, the threshold of the val phase is
+    # 0.01, and the threshold of the test phase is 0.001.
+    test_cfg=dict(score_thr=0.01, nms=dict(type="nms", iou_threshold=0.65)),
 )
 
 
@@ -203,10 +123,24 @@ model = dict(
 ########### schedules settings ############
 ###########################################
 # optimizer
-optimizer = dict(type="SGD", lr=0.02, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(
+    type="SGD",
+    lr=0.01,
+    momentum=0.9,
+    weight_decay=5e-4,
+    nesterov=True,  # default: False 不知道什么意思
+    paramwise_cfg=dict(norm_decay_mult=0.0, bias_decay_mult=0.0),  # 不知道什么意思
+)
 optimizer_config = dict(grad_clip=None)
+
 # learning policy
-lr_config = dict(policy="step", warmup="linear", warmup_iters=500, warmup_ratio=0.001, step=[8, 11])
+lr_config = dict(
+    policy="step",
+    warmup="linear",
+    warmup_iters=500,
+    warmup_ratio=0.001,
+    step=[8, 11],
+)
 runner = dict(type="EpochBasedRunner", max_epochs=12)
 
 ###########################################
@@ -225,10 +159,10 @@ log_config = dict(
 custom_hooks = [dict(type="NumClassCheckHook")]
 
 dist_params = dict(backend="nccl")
-log_level = "INFO"
+log_level = "INFO"  # 控制log的输出级别
 load_from = None
 resume_from = None
-workflow = [("train", 1)]
+workflow = [("train", 1)]  # 1个epoch的workflow，即一个epoch进行一个epoch的train
 
 # disable opencv multithreading to avoid system being overloaded
 opencv_num_threads = 0

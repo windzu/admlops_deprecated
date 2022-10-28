@@ -86,9 +86,9 @@ data = dict(
 ###########################################
 model = dict(
     type="YOLOX",
-    input_size=img_scale,
-    random_size_range=(15, 25),
-    random_size_interval=10,
+    input_size=img_scale,  # 网络输入尺寸
+    random_size_range=(15, 25),  # 多尺度训练时随机乘以的尺度范围
+    random_size_interval=10,  # 多尺度训练时在尺度变化中变化的间隔
     backbone=dict(
         # CSPDarknet 默认使用 P5 结构
         # 其结构如下：
@@ -106,15 +106,15 @@ model = dict(
     ),
     neck=dict(
         type="YOLOXPAFPN",
-        in_channels=[128, 256, 512],  # 输入的每个scale的channel数
-        out_channels=128,
+        in_channels=[128, 256, 512],  # 输入的每个scale的channel数,与backbone的out_channels对应
+        out_channels=128,  # 输出的channel数
         num_csp_blocks=1,
     ),
     bbox_head=dict(
         type="YOLOXHead",
         num_classes=len(class_names),
-        in_channels=128,
-        feat_channels=128,
+        in_channels=128,  # neck的输出channel数
+        feat_channels=128,  # 在stacked conv中间的channel数
     ),
     train_cfg=dict(assigner=dict(type="SimOTAAssigner", center_radius=2.5)),
     # In order to align the source code, the threshold of the val phase is
